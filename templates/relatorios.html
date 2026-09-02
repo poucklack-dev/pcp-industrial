@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block page_title %}Relatórios{% endblock %}
+
+{% block content %}
+<style>
+    /* ============================================================ */
+    /* ESTILOS ESPECÍFICOS PARA RELATÓRIOS                         */
+    /* ============================================================ */
+    
+    .card-relatorio {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+
+    .table-relatorio {
+        color: var(--text);
+        border-color: var(--line);
+    }
+
+    .table-relatorio thead {
+        color: var(--muted);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .table-relatorio td {
+        border-bottom: 1px solid var(--line);
+    }
+
+    .badge-producao {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: #198754;
+        color: #fff;
+    }
+
+    .badge-consumo {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: #dc3545;
+        color: #fff;
+    }
+
+    .badge-ajuste {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: #ffc107;
+        color: #000;
+    }
+
+    .kpi-relatorio {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text);
+    }
+
+    .kpi-relatorio .label {
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--muted);
+        display: block;
+    }
+
+    .kpi-card {
+        text-align: center;
+        padding: 15px;
+        background: var(--panel2);
+        border-radius: 8px;
+        border: 1px solid var(--line);
+    }
+
+    .filtro-relatorio {
+        background: #0d131a;
+        border-color: var(--line);
+        color: var(--text);
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+    }
+
+    .filtro-relatorio:focus {
+        background: #0d131a;
+        color: #fff;
+        border-color: var(--accent);
+        outline: none;
+    }
+
+    @media (max-width: 768px) {
+        .card-relatorio {
+            padding: 12px;
+        }
+        
+        .kpi-relatorio {
+            font-size: 18px;
+        }
+    }
+</style>
+
+<!-- ============================================================ -->
+<!-- KPI - Indicadores                                           -->
+<!-- ============================================================ -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <span class="label">Total de OP's</span>
+            <div class="kpi-relatorio">{{ ops|length }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <span class="label">Movimentações de produção</span>
+            <div class="kpi-relatorio">{{ producao|length }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <span class="label">Consumos registrados</span>
+            <div class="kpi-relatorio">{{ consumos|length }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <span class="label">Total movimentações</span>
+            <div class="kpi-relatorio">{{ (producao|length) + (consumos|length) }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FILTROS (opcional)                                          -->
+<!-- ============================================================ -->
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card-relatorio">
+            <div class="d-flex gap-2 align-items-center">
+                <label class="form-label mb-0">Período:</label>
+                <input class="filtro-relatorio" type="date" id="data-inicio" value="{{ now.strftime('%Y-%m-%d') if now else '' }}">
+                <span class="muted">até</span>
+                <input class="filtro-relatorio" type="date" id="data-fim" value="{{ now.strftime('%Y-%m-%d') if now else '' }}">
+                <button class="btn btn-primary btn-sm" onclick="filtrar()">Filtrar</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 text-end">
+        <div class="card-relatorio">
+            <button class="btn btn-outline-light btn-sm" onclick="window.print()">
+                <i class="bi bi-printer"></i> Imprimir
+            </button>
+            <button class="btn btn-outline-light btn-sm" onclick="exportarCSV()">
+                <i class="bi bi-file-spreadsheet"></i> Exportar CSV
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TABELA - PRODUÇÃO                                           -->
+<!-- ============================================================ -->
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card-relatorio">
+            <h5>
+                <span class="badge-producao">Produção</span>
+                <span class="muted ms-2" style="font-size: 0.85rem;">Últimas movimentações</span>
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-relatorio" id="tabela-producao">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Produto</th>
+                            <th>Qtd.</th>
+                            <th>OP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in producao %}
+                        <tr>
+                            <td>{{ m.data_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ m.produto.codigo }} — {{ m.produto.descricao }}</td>
+                            <td class="good-stock">+{{ m.quantidade|g }}</td>
+                            <td>{{ m.op.numero if m.op else '—' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="muted text-center">Nenhuma movimentação de produção.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TABELA - CONSUMOS                                          -->
+    <!-- ============================================================ -->
+    <div class="col-lg-6">
+        <div class="card-relatorio">
+            <h5>
+                <span class="badge-consumo">Consumos</span>
+                <span class="muted ms-2" style="font-size: 0.85rem;">Últimas movimentações</span>
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-relatorio" id="tabela-consumo">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Produto</th>
+                            <th>Qtd.</th>
+                            <th>OP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in consumos %}
+                        <tr>
+                            <td>{{ m.data_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ m.produto.codigo }} — {{ m.produto.descricao }}</td>
+                            <td class="danger-stock">-{{ m.quantidade|g }}</td>
+                            <td>{{ m.op.numero if m.op else '—' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="muted text-center">Nenhum consumo registrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- RESUMO DAS OP's                                            -->
+    <!-- ============================================================ -->
+    <div class="col-12">
+        <div class="card-relatorio">
+            <h5>Resumo das Ordens de Produção</h5>
+            <div class="table-responsive">
+                <table class="table table-relatorio">
+                    <thead>
+                        <tr>
+                            <th>OP</th>
+                            <th>Produto</th>
+                            <th>Planejado</th>
+                            <th>Produzido</th>
+                            <th>Saldo</th>
+                            <th>Progresso</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for op in ops %}
+                        {% set percentual = (op.quantidade_produzida / op.quantidade_planejada * 100) if op.quantidade_planejada else 0 %}
+                        <tr>
+                            <td><strong>{{ op.numero }}</strong></td>
+                            <td>{{ op.produto.codigo }} — {{ op.produto.descricao }}</td>
+                            <td>{{ op.quantidade_planejada|g }}</td>
+                            <td>{{ op.quantidade_produzida|g }}</td>
+                            <td>{{ (op.quantidade_planejada - op.quantidade_produzida)|g }}</td>
+                            <td>
+                                <div class="progress" style="height: 6px; width: 100px;">
+                                    <div class="progress-bar" style="width:{% if percentual > 100 %}100{% else %}{{ percentual }}{% endif %}%"></div>
+                                </div>
+                                <span class="muted" style="font-size: 0.75rem;">{{ percentual|round(0) }}%</span>
+                            </td>
+                            <td><span class="status">{{ op.status }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="muted text-center">Nenhuma OP cadastrada.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ============================================================ //
+    // FUNÇÕES DE FILTRO E EXPORTAÇÃO                              //
+    // ============================================================ //
+    
+    function filtrar() {
+        const dataInicio = document.getElementById('data-inicio').value;
+        const dataFim = document.getElementById('data-fim').value;
+        
+        if (dataInicio && dataFim) {
+            const rows = document.querySelectorAll('#tabela-producao tbody tr, #tabela-consumo tbody tr');
+            rows.forEach(row => {
+                const dataCell = row.querySelector('td:first-child');
+                if (dataCell) {
+                    const data = dataCell.textContent.trim();
+                    // Converter DD/MM/YYYY para YYYY-MM-DD
+                    const partes = data.split('/');
+                    if (partes.length === 3) {
+                        const dataISO = `${partes[2]}-${partes[1]}-${partes[0]}`;
+                        if (dataISO < dataInicio || dataISO > dataFim) {
+                            row.style.display = 'none';
+                        } else {
+                            row.style.display = '';
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    function exportarCSV() {
+        // Pega todas as tabelas e exporta como CSV
+        const tabelas = document.querySelectorAll('.table-relatorio');
+        let csv = '';
+        
+        tabelas.forEach((tabela, index) => {
+            const cabecalho = tabela.querySelectorAll('thead th');
+            const linhas = tabela.querySelectorAll('tbody tr');
+            
+            if (linhas.length > 0) {
+                // Adiciona título
+                const titulo = document.querySelectorAll('.card-relatorio h5')[index];
+                if (titulo) {
+                    csv += `\n"${titulo.textContent.trim()}"\n`;
+                }
+                
+                // Adiciona cabeçalho
+                cabecalho.forEach(th => {
+                    csv += `"${th.textContent.trim()}";`;
+                });
+                csv += '\n';
+                
+                // Adiciona linhas
+                linhas.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    cells.forEach(cell => {
+                        csv += `"${cell.textContent.trim()}";`;
+                    });
+                    csv += '\n';
+                });
+                
+                csv += '\n';
+            }
+        });
+        
+        // Download do arquivo
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `relatorio_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+    }
+</script>
+{% endblock %}

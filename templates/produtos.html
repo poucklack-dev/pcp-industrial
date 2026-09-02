@@ -1,0 +1,1477 @@
+{% extends "base.html" %}
+
+{% block page_title %}Produtos{% endblock %}
+
+{% block content %}
+    {# PESQUISA E CATEGORIAS #}
+    <div class="card mb-3">
+        <form class="row g-2" method="GET" action="{{ url_for('produtos.index') }}">
+            <input type="hidden" name="tipo" id="tipoProdutoFiltro" value="{{ tipo }}">
+            <div class="col-lg-5">
+                <input class="form-control" name="busca" value="{{busca}}" placeholder="Pesquisar código ou descrição">
+            </div>
+            <div class="col-lg-7 d-flex gap-2 flex-wrap">
+                <button type="button" class="btn {% if tipo == 'PA' %}btn-primary{% else %}btn-outline-light{% endif %}" onclick="window.mudarCategoriaProduto('PA')">
+                    <i class="bi bi-box-seam me-1"></i>Produtos Acabados
+                </button>
+                <button type="button" class="btn {% if tipo == 'SA' %}btn-primary{% else %}btn-outline-light{% endif %}" onclick="window.mudarCategoriaProduto('SA')">
+                    <i class="bi bi-boxes me-1"></i>Semiacabados
+                </button>
+                <button type="button" class="btn {% if tipo == 'MP' %}btn-primary{% else %}btn-outline-light{% endif %}" onclick="window.mudarCategoriaProduto('MP')">
+                    <i class="bi bi-droplet me-1"></i>Matérias-primas
+                </button>
+                <button class="btn btn-outline-secondary ms-lg-auto" title="Pesquisar nesta categoria">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    {# BOTÃO NOVO #}
+    {% if pode_editar %}
+    <div class="d-flex justify-content-end mb-3">
+        <button class="btn btn-primary" onclick="window.abrirModalNovo()">
+            <i class="bi bi-plus-lg"></i> Novo Produto
+        </button>
+    </div>
+    {% endif %}
+    
+    {# TABELA #}
+    <div class="table-wrap p-2">
+        <div class="table-responsive">
+            <table class="table align-middle" id="tabelaProdutos">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th>Un.</th>
+                        <th>Estoque</th>
+                        <th>Mínimo</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="corpoTabela">
+                    {% for p in produtos %}
+                        <tr id="produto-{{p.id}}" style="cursor:pointer" onclick="window.abrirModalDetalhe({{p.id}})">
+                            <td><strong>{{p.codigo}}</strong></td>
+                            <td>{{p.descricao}}</td>
+                            <td>{{p.unidade}}</td>
+                            <td class="{% if p.estoque_atual < p.estoque_minimo %}text-danger{% else %}text-success{% endif %}">
+                                {{ p.estoque_atual|medida(p.unidade) }}
+                            </td>
+                            <td>
+                                {{ p.estoque_minimo|medida(p.unidade) }}
+                            </td>
+                            <td>
+                                <span class="badge {% if p.status == 'Ativo' %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{p.status}}
+                                </span>
+                            </td>
+                            <td onclick="event.stopPropagation()">
+                                <button class="btn btn-sm btn-outline-light" onclick="window.abrirModalDetalhe({{p.id}})">Abrir</button>
+                                <button class="btn btn-sm btn-outline-light" onclick="window.abrirAcoesProduto({{ p.id }}, '{{ p.tipo }}')" title="Mais ações" aria-label="Mais ações do produto">
+                                    <i class="bi bi-three-dots"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr id="nenhum-produto">
+                            <td colspan="7" class="text-center py-4 text-muted">Nenhum {{ 'produto acabado' if tipo == 'PA' else 'semiacabado' if tipo == 'SA' else 'matéria-prima' }} cadastrado(a).</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# MODAL DE DETALHES #}
+    <div class="modal fade" id="modalDetalhe" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content bg-dark text-light border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-light">
+                        <i class="bi bi-box-seam text-primary me-2"></i>Detalhes do Produto
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalDetalheBody">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Carregando detalhes...</p>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# MODAL DE FORMULÁRIO (NOVO/EDITAR) #}
+    <div class="modal fade" id="modalForm" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content bg-dark text-light border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-light" id="modalFormTitle">
+                        <i class="bi bi-pencil-square text-primary me-2"></i>Novo Produto
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalFormBody">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Carregando formulário...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# MODAL DE ESTRUTURA #}
+    <div class="modal fade" id="modalEstrutura" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content bg-dark text-light border-primary">
+                <div class="modal-header border-primary">
+                    <h5 class="modal-title text-light">
+                        <i class="bi bi-diagram-3 text-primary me-2"></i>Estrutura do Produto
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalEstruturaBody">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Carregando estrutura...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# MODAL DE EXCLUSÃO #}
+    <div class="modal fade" id="modalExcluir" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-light border-danger">
+                <div class="modal-header border-danger">
+                    <h5 class="modal-title text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmar Exclusão
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalExcluirBody">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-danger" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Carregando dados do produto...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Ações fora da tabela: evita que o menu seja cortado pelo grid #}
+    <div class="modal fade" id="modalAcoesProduto" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content bg-dark text-light border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-box-seam text-primary me-2"></i>Ações do produto</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body d-grid gap-2" id="modalAcoesProdutoBody"></div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ==================== DADOS GLOBAIS ====================
+    
+    window.maquinas = [];
+    try {
+        window.maquinas = {{ maquinas|tojson|safe }};
+        if (!Array.isArray(window.maquinas)) {
+            window.maquinas = [];
+        }
+    } catch (e) {
+        console.error('Erro ao carregar máquinas:', e);
+        window.maquinas = [];
+    }
+
+    window.unidades = {{ unidades|tojson|safe }};
+    window.tipoProdutoAtivo = {{ tipo|tojson }};
+
+    window.mudarCategoriaProduto = function(tipo) {
+        const filtro = document.getElementById('tipoProdutoFiltro');
+        if (!filtro || !filtro.form) return;
+        filtro.value = tipo;
+        filtro.form.submit();
+    };
+
+    // ==================== FUNÇÃO PARA FORMATAR NÚMEROS ====================
+    
+    window.formatarNumero = function(valor) {
+        if (valor === undefined || valor === null) return '0';
+        const num = Number(valor);
+        if (!Number.isFinite(num)) return '0';
+        return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(num);
+    };
+
+    window.formatarQuantidade = function(valor, unidade) {
+        return [window.formatarNumero(valor), window.rotuloUnidade(unidade)].filter(Boolean).join(' ');
+    };
+
+    window.rotuloUnidade = function(unidade) {
+        const nomes = { UN: 'un.', DZ: 'dz', KG: 'kg', G: 'g', MG: 'mg', L: 'L', ML: 'ml', M: 'm', CM: 'cm', MM: 'mm' };
+        return nomes[unidade] || unidade || '';
+    };
+
+    window.atualizarUnidadeEstoqueInicial = function(unidade) {
+        const destino = document.getElementById('unidadeEstoqueInicial');
+        if (destino) destino.textContent = window.rotuloUnidade(unidade);
+    };
+
+    // ==================== FUNÇÕES DE ABERTURA DE MODAIS ====================
+    
+    window.abrirModalDetalhe = function(id) {
+        const modalElement = document.getElementById('modalDetalhe');
+        if (!modalElement) return;
+        
+        const modal = new bootstrap.Modal(modalElement);
+        const body = document.getElementById('modalDetalheBody');
+        if (!body) return;
+        
+        body.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2 text-muted">Carregando detalhes...</p>
+            </div>
+        `;
+        
+        fetch(`/produtos/${id}/detalhe_json`)
+            .then(response => response.json())
+            .then(data => {
+                body.innerHTML = window.criarHtmlDetalhe(data);
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar detalhes:', error);
+                body.innerHTML = `
+                    <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        Erro ao carregar detalhes: ${error.message}
+                    </div>
+                `;
+                modal.show();
+            });
+    };
+
+    window.abrirModalNovo = function() {
+        const modalElement = document.getElementById('modalForm');
+        if (!modalElement) return;
+        
+        const modal = new bootstrap.Modal(modalElement);
+        const body = document.getElementById('modalFormBody');
+        const title = document.getElementById('modalFormTitle');
+        if (!body || !title) return;
+        
+        title.innerHTML = '<i class="bi bi-plus-circle text-primary me-2"></i>Novo Produto';
+        body.innerHTML = window.criarHtmlFormulario(null);
+        modal.show();
+    };
+
+    window.fecharModalAcoesProduto = function() {
+        const modalElement = document.getElementById('modalAcoesProduto');
+        if (modalElement) bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+    };
+
+    window.abrirAcoesProduto = function(id, tipo) {
+        const modalElement = document.getElementById('modalAcoesProduto');
+        const body = document.getElementById('modalAcoesProdutoBody');
+        if (!modalElement || !body) return;
+
+        const possuiEstrutura = ['PA', 'SA'].includes(tipo);
+        body.innerHTML = `
+            <button type="button" class="btn btn-outline-light text-start" onclick="window.fecharModalAcoesProduto(); window.abrirModalDetalhe(${id})">
+                <i class="bi bi-box-arrow-up-right me-2"></i>Abrir ficha
+            </button>
+            <button type="button" class="btn btn-outline-warning text-start" onclick="window.fecharModalAcoesProduto(); window.abrirModalEditar(${id})">
+                <i class="bi bi-pencil-square me-2"></i>Editar produto
+            </button>
+            ${possuiEstrutura ? `<button type="button" class="btn btn-outline-info text-start" onclick="window.fecharModalAcoesProduto(); window.abrirModalEstrutura(${id})">
+                <i class="bi bi-diagram-3 me-2"></i>Editar estrutura / BOM
+            </button>` : ''}
+            <hr class="my-1 border-secondary">
+            <button type="button" class="btn btn-outline-danger text-start" onclick="window.fecharModalAcoesProduto(); window.abrirModalExcluir(${id})">
+                <i class="bi bi-trash3 me-2"></i>Excluir produto
+            </button>
+        `;
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    };
+
+    window.abrirModalEditar = function(id) {
+        const modalElement = document.getElementById('modalForm');
+        if (!modalElement) return;
+        
+        const modal = new bootstrap.Modal(modalElement);
+        const body = document.getElementById('modalFormBody');
+        const title = document.getElementById('modalFormTitle');
+        if (!body || !title) return;
+        
+        title.innerHTML = '<i class="bi bi-pencil-square text-warning me-2"></i>Editar Produto';
+        body.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2 text-muted">Carregando dados do produto...</p>
+            </div>
+        `;
+        
+        fetch(`/produtos/${id}/detalhe_json`)
+            .then(response => response.json())
+            .then(data => {
+                body.innerHTML = window.criarHtmlFormulario(data);
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar formulário:', error);
+                body.innerHTML = `
+                    <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        Erro ao carregar formulário: ${error.message}
+                    </div>
+                `;
+                modal.show();
+            });
+    };
+
+    window.abrirModalEstrutura = function(id) {
+        console.log('abrirModalEstrutura chamado para ID:', id);
+        const modalElement = document.getElementById('modalEstrutura');
+        if (!modalElement) {
+            console.error('ModalEstrutura não encontrado');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(modalElement);
+        const body = document.getElementById('modalEstruturaBody');
+        if (!body) {
+            console.error('modalEstruturaBody não encontrado');
+            return;
+        }
+        
+        body.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2 text-muted">Carregando estrutura...</p>
+            </div>
+        `;
+        
+        // Salva o ID do produto para uso posterior
+        window.produtoEstruturaId = id;
+        
+        fetch(`/produtos/${id}/estrutura`)
+            .then(response => {
+                console.log('Resposta da estrutura:', response);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Dados da estrutura:', data);
+                if (data.success) {
+                    body.innerHTML = window.criarHtmlEstrutura(data);
+                    // Carrega os componentes disponíveis
+                    setTimeout(() => {
+                        window.carregarComponentesDisponiveis();
+                    }, 100);
+                } else {
+                    body.innerHTML = `
+                        <div class="alert alert-warning bg-warning bg-opacity-10 border border-warning">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                            ${data.message || 'Erro ao carregar estrutura'}
+                        </div>
+                    `;
+                }
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar estrutura:', error);
+                body.innerHTML = `
+                    <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        Erro ao carregar estrutura: ${error.message}
+                        <br><small class="text-muted">Verifique se o servidor está respondendo corretamente.</small>
+                    </div>
+                    <div class="text-center mt-3">
+                        <button class="btn btn-secondary" onclick="window.abrirModalEstrutura(${id})">
+                            <i class="bi bi-arrow-repeat me-1"></i> Tentar novamente
+                        </button>
+                    </div>
+                `;
+                modal.show();
+            });
+    };
+
+    window.abrirModalExcluir = function(id) {
+        const modalElement = document.getElementById('modalExcluir');
+        if (!modalElement) return;
+        
+        const modal = new bootstrap.Modal(modalElement);
+        const body = document.getElementById('modalExcluirBody');
+        if (!body) return;
+        
+        body.innerHTML = `
+            <div class="text-center py-3">
+                <div class="spinner-border text-danger" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2 text-muted">Carregando dados do produto...</p>
+            </div>
+        `;
+        
+        fetch(`/produtos/${id}/detalhe_json`)
+            .then(response => response.json())
+            .then(data => {
+                body.innerHTML = window.criarHtmlExclusao(data);
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar dados para exclusão:', error);
+                body.innerHTML = `
+                    <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        Erro ao carregar dados: ${error.message}
+                    </div>
+                `;
+                modal.show();
+            });
+    };
+
+    // ==================== CRIAÇÃO DE HTML DINÂMICO ====================
+
+    window.criarHtmlDetalhe = function(produto) {
+        if (!produto) {
+            return `
+                <div class="alert alert-warning bg-warning bg-opacity-10 border border-warning">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                    Produto não encontrado
+                </div>
+            `;
+        }
+        
+        const maquinaHtml = produto.maquina ? 
+            `<span class="badge bg-info bg-opacity-25 text-info p-2">
+                <i class="bi bi-cpu me-1"></i>
+                <strong>${produto.maquina.codigo || ''}</strong> — ${produto.maquina.nome || ''}
+            </span>` : 
+            '<span class="text-muted"><i class="bi bi-dash-circle me-1"></i>Nenhuma máquina associada</span>';
+        
+        const statusBadge = produto.status === 'Ativo' ? 'bg-success' : 'bg-secondary';
+        const estoqueClass = produto.estoque_atual < produto.estoque_minimo ? 'text-danger' : 'text-success';
+        
+        let estruturaHtml = '';
+        if (produto.estrutura && produto.estrutura.length > 0) {
+            estruturaHtml = `
+                <div class="mt-3">
+                    <h6 class="text-primary">
+                        <i class="bi bi-diagram-3 me-2"></i>Estrutura do Produto
+                        <span class="badge bg-primary ms-2">${produto.estrutura.length} componentes</span>
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-dark table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Descrição</th>
+                                    <th>Tipo</th>
+                                    <th>Consumo por unidade produzida</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${produto.estrutura.map(item => `
+                                    <tr>
+                                        <td><strong>${item.componente_codigo}</strong></td>
+                                        <td>${item.componente_descricao}</td>
+                                        <td>${item.componente_tipo_nome}</td>
+                                        <td class="text-info">${window.formatarQuantidade(item.quantidade, item.unidade_uso || item.componente_unidade)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } else if (produto.tipo === 'PA' || produto.tipo === 'SA') {
+            estruturaHtml = `
+                <div class="mt-3 p-3 bg-warning bg-opacity-10 rounded border border-warning">
+                    <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                    <span class="text-warning">Este produto não possui estrutura definida.</span>
+                    <button class="btn btn-sm btn-primary ms-2" onclick="window.abrirModalEstrutura(${produto.id})">
+                        <i class="bi bi-diagram-3 me-1"></i>Definir Estrutura
+                    </button>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="row g-3">
+                <div class="col-12">
+                    <h4 class="text-light mb-3">
+                        <i class="bi bi-box-seam text-primary me-2"></i>
+                        ${produto.descricao || ''}
+                    </h4>
+                    <div class="bg-dark bg-opacity-50 p-3 rounded border border-secondary">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="p-2 bg-dark bg-opacity-25 rounded">
+                                    <small class="text-muted d-block"><i class="bi bi-hash me-1"></i>Código</small>
+                                    <strong class="text-light">${produto.codigo || '-'}</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-2 bg-dark bg-opacity-25 rounded">
+                                    <small class="text-muted d-block"><i class="bi bi-tag me-1"></i>Tipo</small>
+                                    <strong class="text-light">${produto.tipo_nome || produto.tipo || '-'}</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-2 bg-dark bg-opacity-25 rounded">
+                                    <small class="text-muted d-block"><i class="bi bi-circle me-1"></i>Status</small>
+                                    <span class="badge ${statusBadge}">${produto.status || 'Inativo'}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-2 bg-dark bg-opacity-25 rounded">
+                                    <small class="text-muted d-block"><i class="bi bi-box me-1"></i>Estoque Atual</small>
+                                    <strong class="${estoqueClass}">${window.formatarQuantidade(produto.estoque_atual, produto.unidade)}</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-2 bg-dark bg-opacity-25 rounded">
+                                    <small class="text-muted d-block"><i class="bi bi-exclamation-triangle me-1"></i>Estoque Mínimo</small>
+                                    <strong class="text-light">${window.formatarQuantidade(produto.estoque_minimo, produto.unidade)}</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-2 bg-dark bg-opacity-25 rounded">
+                                    <small class="text-muted d-block"><i class="bi bi-rulers me-1"></i>Unidade</small>
+                                    <strong class="text-light">${produto.unidade || '-'}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${produto.maquina ? `
+                        <div class="mt-3 p-3 bg-primary bg-opacity-10 rounded border border-primary">
+                            <small class="text-muted d-block"><i class="bi bi-cpu me-1"></i>Máquina Associada</small>
+                            ${maquinaHtml}
+                        </div>
+                    ` : ''}
+                    
+                    ${estruturaHtml}
+                    
+                    ${produto.observacao ? `
+                        <div class="mt-3 p-3 bg-secondary bg-opacity-10 rounded border border-secondary">
+                            <small class="text-muted d-block"><i class="bi bi-chat me-1"></i>Observação</small>
+                            <p class="mb-0 text-light">${produto.observacao}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    };
+
+    window.criarHtmlFormulario = function(produto) {
+        const isEdit = produto !== null && produto !== undefined;
+        const url = isEdit ? `/produtos/${produto.id}/editar` : '/produtos/novo';
+        
+        const tipos = [
+            { value: 'MP', label: 'Matéria-prima' },
+            { value: 'SA', label: 'Semiacabado' },
+            { value: 'PA', label: 'Acabado' }
+        ];
+        
+        let tipoOptions = tipos.map(t => 
+            `<option value="${t.value}" ${isEdit && produto.tipo === t.value ? 'selected' : ''}>${t.label}</option>`
+        ).join('');
+        const unidadeAtual = isEdit ? (produto.unidade || 'UN') : 'UN';
+        const unidadeOptions = window.unidades.map(u =>
+            `<option value="${u.codigo}" ${u.codigo === unidadeAtual ? 'selected' : ''}>${u.codigo} — ${u.nome}</option>`
+        ).join('');
+        
+        let maquinaOptions = '<option value="">Nenhuma</option>';
+        if (Array.isArray(window.maquinas) && window.maquinas.length > 0) {
+            maquinaOptions += window.maquinas.map(m => 
+                `<option value="${m.id}" ${isEdit && produto.maquina && produto.maquina.id === m.id ? 'selected' : ''}>
+                    ${m.codigo || ''} — ${m.nome || 'Sem nome'}
+                </option>`
+            ).join('');
+        }
+        
+        const campoEstoqueInicial = !isEdit ? `
+            <div class="col-md-4">
+                <label class="form-label text-light"><i class="bi bi-box me-1"></i>Estoque inicial <span class="text-info">(saldo atual)</span></label>
+                <div class="input-group">
+                    <input class="form-control bg-dark text-light border-secondary" type="number" step="0.0001" name="estoque_atual" value="0" placeholder="Ex.: 500">
+                    <span class="input-group-text bg-secondary border-secondary text-light" id="unidadeEstoqueInicial">un.</span>
+                </div>
+            </div>
+        ` : '';
+        
+        const campoObservacao = `
+            <div class="col-12">
+                <label class="form-label text-light"><i class="bi bi-chat me-1"></i>Observação</label>
+                <textarea class="form-control bg-dark text-light border-secondary" name="observacao" rows="2" placeholder="Observações sobre o produto...">${isEdit ? (produto.observacao || '') : ''}</textarea>
+            </div>
+        `;
+        
+        return `
+            <form id="formProduto" onsubmit="event.preventDefault(); window.enviarFormulario('${url}');">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label text-light"><i class="bi bi-hash me-1"></i>Código <span class="text-danger">*</span></label>
+                        <input class="form-control bg-dark text-light border-secondary" name="codigo" required 
+                               value="${isEdit ? (produto.codigo || '') : ''}" 
+                               placeholder="Ex: PROD-001">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label text-light"><i class="bi bi-fonts me-1"></i>Descrição <span class="text-danger">*</span></label>
+                        <input class="form-control bg-dark text-light border-secondary" name="descricao" required 
+                               value="${isEdit ? (produto.descricao || '') : ''}" 
+                               placeholder="Descrição do produto">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-light"><i class="bi bi-tag me-1"></i>Tipo <span class="text-danger">*</span></label>
+                        <select class="form-select bg-dark text-light border-secondary" name="tipo" required id="tipoProduto">
+                            ${tipoOptions}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-light"><i class="bi bi-rulers me-1"></i>Unidade <span class="text-danger">*</span></label>
+                        <select class="form-select bg-dark text-light border-secondary" name="unidade" required onchange="window.atualizarUnidadeEstoqueInicial(this.value)">
+                            ${unidadeOptions}
+                        </select>
+                    </div>
+                    ${campoEstoqueInicial}
+                    <div class="col-md-3">
+                        <label class="form-label text-light"><i class="bi bi-exclamation-triangle me-1"></i>Estoque mínimo</label>
+                        <input class="form-control bg-dark text-light border-secondary" type="number" step="0.0001" 
+                               name="estoque_minimo" 
+                               value="${isEdit ? (produto.estoque_minimo || 0) : 0}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-light"><i class="bi bi-circle me-1"></i>Status</label>
+                        <select class="form-select bg-dark text-light border-secondary" name="status">
+                            <option value="Ativo" ${!isEdit || produto.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                            <option value="Inativo" ${isEdit && produto.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12" id="divMaquina">
+                        <label class="form-label text-light"><i class="bi bi-cpu me-1"></i>Máquina associada</label>
+                        <small class="text-muted d-block">(somente matéria-prima)</small>
+                        <select class="form-select bg-dark text-light border-secondary" name="maquina_id">
+                            ${maquinaOptions}
+                        </select>
+                    </div>
+                    ${campoObservacao}
+                </div>
+                <div class="mt-4 d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <i class="bi bi-check-lg me-1"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        `;
+    };
+
+    window.criarHtmlEstrutura = function(data) {
+        if (!data || !data.success) {
+            return `
+                <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                    ${data.message || 'Erro ao carregar estrutura'}
+                </div>
+            `;
+        }
+        
+        const temComponentes = data.componentes && data.componentes.length > 0;
+        
+        let tabelaHtml = '';
+        if (temComponentes) {
+            tabelaHtml = `
+                <div class="table-responsive">
+                    <table class="table table-dark table-striped">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Descrição</th>
+                                <th>Tipo</th>
+                                <th>Uso</th>
+                                <th>Estoque</th>
+                                <th>Quantidade</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.componentes.map(item => `
+                                <tr id="comp-${item.id}">
+                                    <td><strong>${item.componente_codigo}</strong></td>
+                                    <td>${item.componente_descricao}</td>
+                                    <td>${item.componente_tipo_nome}</td>
+                                    <td>${item.unidade_uso || item.componente_unidade}</td>
+                                    <td class="${item.componente_estoque < item.componente_estoque_minimo ? 'text-danger' : 'text-success'}">
+                                        ${window.formatarQuantidade(item.componente_estoque, item.componente_unidade)}
+                                    </td>
+                                    <td>
+                                        <div class="input-group input-group-sm" style="min-width: 135px;">
+                                            <input class="form-control bg-dark text-light border-secondary" type="number" step="0.0001" id="qtd-${item.id}" value="${item.quantidade}">
+                                            <span class="input-group-text bg-secondary border-secondary text-light">${item.unidade_uso || item.componente_unidade}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning me-1" onclick="document.getElementById('qtd-${item.id}').focus()" title="Editar consumo">
+                                            <i class="bi bi-pencil"></i><span class="d-none d-lg-inline ms-1">Editar</span>
+                                        </button>
+                                        <button class="btn btn-sm btn-success me-1" onclick="window.salvarEdicaoComponente(${item.id})" title="Salvar alterações">
+                                            <i class="bi bi-check"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="window.removerComponente(${item.id})" title="Remover componente">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else {
+            tabelaHtml = `
+                <div class="text-center py-4">
+                    <i class="bi bi-diagram-3" style="font-size: 3rem; color: #6c757d;"></i>
+                    <p class="text-muted mt-2">Este produto não possui componentes na estrutura.</p>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="mb-3">
+                <div class="bg-dark bg-opacity-50 p-3 rounded border border-secondary">
+                    <h5 class="text-light">
+                        <i class="bi bi-box-seam text-primary me-2"></i>
+                        ${data.produto_codigo} - ${data.produto_descricao}
+                    </h5>
+                    <p class="text-muted">
+                        <i class="bi bi-tag me-1"></i> Total de componentes: <strong>${data.total_componentes}</strong>
+                    </p>
+                </div>
+            </div>
+            
+            ${tabelaHtml}
+            
+            <hr class="border-primary">
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="bg-dark bg-opacity-25 p-3 rounded border border-secondary">
+                        <h6 class="text-primary">
+                            <i class="bi bi-plus-circle me-2"></i>Adicionar Componente
+                        </h6>
+                        <form id="formAdicionarComponente" onsubmit="event.preventDefault(); window.adicionarComponente(${data.produto_id});">
+                            <div class="row g-2">
+                                <div class="col-md-5">
+                                    <select class="form-select bg-dark text-light border-secondary" id="componenteSelect" required>
+                                        <option value="">Selecione um componente...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <input class="form-control bg-dark text-light border-secondary" type="number" step="0.0001" 
+                                           id="quantidadeComp" placeholder="Qtd" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <select class="form-select bg-dark text-light border-secondary" id="unidadeComp" required disabled>
+                                        <option value="">Unidade</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="bi bi-plus-lg me-1"></i>Adicionar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <input class="form-control bg-dark text-light border-secondary" id="obsComp" 
+                                           placeholder="Observação (opcional)">
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="bg-info bg-opacity-10 p-3 rounded border border-info">
+                        <h6 class="text-info">
+                            <i class="bi bi-info-circle me-2"></i>Informações
+                        </h6>
+                        <ul class="list-unstyled text-light small">
+                            <li><i class="bi bi-check-circle text-success me-1"></i> Componentes podem ser MP ou SA</li>
+                            <li><i class="bi bi-x-circle text-danger me-1"></i> Produtos Acabados não podem ser componentes</li>
+                            <li><i class="bi bi-pencil text-info me-1"></i> Edite a quantidade e clique em ✓</li>
+                            <li><i class="bi bi-clipboard-check text-primary me-1"></i> Perdas são registradas no apontamento da produção</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="mensagemEstrutura"></div>
+        `;
+    };
+
+    window.criarHtmlExclusao = function(produto) {
+        if (!produto) {
+            return `
+                <div class="alert alert-warning bg-warning bg-opacity-10 border border-warning">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                    Produto não encontrado
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="text-center mb-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 3rem;"></i>
+                <h5 class="text-danger mt-2">ATENÇÃO!</h5>
+                <p class="text-light">Você está prestes a excluir o produto:</p>
+                <div class="bg-dark bg-opacity-50 p-3 rounded border border-danger">
+                    <strong class="text-light">${produto.codigo || ''}</strong>
+                    <span class="text-muted">—</span>
+                    <span class="text-light">${produto.descricao || ''}</span>
+                </div>
+                ${produto.estrutura && produto.estrutura.length > 0 ? `
+                    <div class="mt-2 text-warning">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        <strong>Atenção:</strong> Este produto possui ${produto.estrutura.length} componente(s) na estrutura.
+                    </div>
+                ` : ''}
+                <p class="text-danger mt-3"><strong>Esta ação não pode ser desfeita!</strong></p>
+            </div>
+            <hr class="border-danger">
+            <div class="mb-3">
+                <label class="form-label text-light">
+                    <i class="bi bi-keyboard me-1"></i>
+                    Digite o nome do produto para confirmar a exclusão:
+                </label>
+                <input type="text" class="form-control bg-dark text-light border-danger" 
+                       id="confirmarExclusaoInput" 
+                       placeholder="Digite: ${produto.descricao || ''}"
+                       oninput="window.validarConfirmacaoExclusao('${produto.descricao || ''}')">
+                <small class="text-muted">Digite exatamente: <strong class="text-light">${produto.descricao || ''}</strong></small>
+            </div>
+            <div class="d-flex gap-2 justify-content-end mt-3">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarExclusao" disabled onclick="window.confirmarExclusao(${produto.id})">
+                    <i class="bi bi-trash me-1"></i> Excluir Permanentemente
+                </button>
+            </div>
+        `;
+    };
+
+    // ==================== FUNÇÕES DE ESTRUTURA ====================
+
+    window.carregarComponentesDisponiveis = function() {
+        const select = document.getElementById('componenteSelect');
+        const selectUnidade = document.getElementById('unidadeComp');
+        if (!select) {
+            console.warn('componenteSelect não encontrado');
+            return;
+        }
+        
+        select.innerHTML = '<option value="">Carregando...</option>';
+        select.disabled = true;
+        
+        fetch('/produtos/componentes_disponiveis')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(componentes => {
+                console.log('Componentes disponíveis:', componentes);
+                window.componentesDisponiveis = componentes || [];
+                select.innerHTML = '<option value="">Selecione um componente...</option>';
+                if (componentes && componentes.length > 0) {
+                    componentes.forEach(comp => {
+                        const option = document.createElement('option');
+                        option.value = comp.id;
+                    option.textContent = `${comp.codigo} — ${comp.descricao} (${comp.tipo_nome}) - Estoque: ${window.formatarQuantidade(comp.estoque_atual, comp.unidade)}`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'Nenhum componente disponível';
+                    select.appendChild(option);
+                }
+                select.disabled = false;
+                select.onchange = function() {
+                    const componente = window.componentesDisponiveis.find(c => String(c.id) === this.value);
+                    const unidades = componente ? componente.unidades_uso : [];
+                    selectUnidade.innerHTML = unidades.map(u => `<option value="${u.codigo}">${u.codigo} — ${u.nome}</option>`).join('') || '<option value="">Unidade</option>';
+                    selectUnidade.disabled = !componente;
+                };
+            })
+            .catch(error => {
+                console.error('Erro ao carregar componentes:', error);
+                select.innerHTML = '<option value="">Erro ao carregar componentes</option>';
+                select.disabled = false;
+            });
+    };
+
+    window.adicionarComponente = function(produtoId) {
+        console.log('adicionarComponente chamado para produtoId:', produtoId);
+        const select = document.getElementById('componenteSelect');
+        const quantidade = document.getElementById('quantidadeComp');
+        const unidade = document.getElementById('unidadeComp');
+        const observacao = document.getElementById('obsComp');
+        
+        if (!select || !quantidade || !unidade) {
+            console.error('Campos do formulário não encontrados');
+            return;
+        }
+        
+        if (!select.value) {
+            window.mostrarMensagemEstrutura('Selecione um componente.', 'warning');
+            return;
+        }
+        
+        if (!quantidade.value || parseFloat(quantidade.value) <= 0) {
+            window.mostrarMensagemEstrutura('Informe uma quantidade válida.', 'warning');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('componente_id', select.value);
+        formData.append('quantidade', quantidade.value);
+        formData.append('unidade_consumo', unidade.value);
+        formData.append('observacao', observacao ? observacao.value || '' : '');
+        
+        // Mostra loading no botão
+        const submitBtn = document.querySelector('#formAdicionarComponente button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Adicionando...';
+        }
+        
+        fetch(`/produtos/${produtoId}/estrutura/adicionar`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Resposta adicionar componente:', data);
+            if (data.success) {
+                window.mostrarMensagemEstrutura(data.message, 'success');
+                // Limpa o formulário
+                select.value = '';
+                quantidade.value = '';
+                unidade.value = '';
+                if (observacao) observacao.value = '';
+                // Recarrega a estrutura
+                setTimeout(() => {
+                    window.abrirModalEstrutura(produtoId);
+                }, 500);
+            } else {
+                window.mostrarMensagemEstrutura(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao adicionar componente:', error);
+            window.mostrarMensagemEstrutura('Erro ao adicionar componente: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Adicionar';
+            }
+        });
+    };
+
+    window.removerComponente = function(estruturaId) {
+        if (!confirm('Deseja realmente remover este componente da estrutura?')) return;
+        
+        const linha = document.getElementById(`comp-${estruturaId}`);
+        if (linha) {
+            linha.style.opacity = '0.5';
+        }
+        
+        fetch(`/produtos/estrutura/${estruturaId}/remover`, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                window.mostrarMensagemEstrutura(data.message, 'success');
+                // Remove a linha da tabela
+                if (linha) {
+                    linha.remove();
+                    // Atualiza o contador
+                    const totalSpan = document.querySelector('#modalEstruturaBody .bg-dark .bg-opacity-50 .text-muted strong');
+                    if (totalSpan) {
+                        const current = parseInt(totalSpan.textContent);
+                        totalSpan.textContent = current - 1;
+                    }
+                }
+                // Recarrega a estrutura após um tempo
+                setTimeout(() => {
+                    if (window.produtoEstruturaId) {
+                        window.abrirModalEstrutura(window.produtoEstruturaId);
+                    }
+                }, 500);
+            } else {
+                window.mostrarMensagemEstrutura(data.message, 'danger');
+                if (linha) {
+                    linha.style.opacity = '1';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao remover componente:', error);
+            window.mostrarMensagemEstrutura('Erro ao remover componente: ' + error.message, 'danger');
+            if (linha) {
+                linha.style.opacity = '1';
+            }
+        });
+    };
+
+    window.salvarEdicaoComponente = function(estruturaId) {
+        const qtdInput = document.getElementById(`qtd-${estruturaId}`);
+        
+        if (!qtdInput) return;
+        
+        const quantidade = parseFloat(qtdInput.value);
+        
+        if (quantidade <= 0) {
+            window.mostrarMensagemEstrutura('Quantidade deve ser maior que zero.', 'warning');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('quantidade', quantidade);
+        formData.append('observacao', '');
+        
+        const btn = document.querySelector(`#comp-${estruturaId} .btn-success`);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+        }
+        
+        fetch(`/produtos/estrutura/${estruturaId}/editar`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                window.mostrarMensagemEstrutura(data.message, 'success');
+            } else {
+                window.mostrarMensagemEstrutura(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao salvar edição:', error);
+            window.mostrarMensagemEstrutura('Erro ao salvar: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check"></i>';
+            }
+        });
+    };
+
+    window.mostrarMensagemEstrutura = function(mensagem, tipo) {
+        const div = document.getElementById('mensagemEstrutura');
+        if (!div) return;
+        
+        const tipos = {
+            'success': 'success bg-success bg-opacity-10 border-success text-success',
+            'danger': 'danger bg-danger bg-opacity-10 border-danger text-danger',
+            'warning': 'warning bg-warning bg-opacity-10 border-warning text-warning',
+            'info': 'info bg-info bg-opacity-10 border-info text-info'
+        };
+        
+        div.innerHTML = `
+            <div class="mt-3 alert alert-${tipo} ${tipos[tipo] || tipos.info} border">
+                <i class="bi bi-${tipo === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-2"></i>
+                ${mensagem}
+            </div>
+        `;
+        
+        setTimeout(() => {
+            div.innerHTML = '';
+        }, 5000);
+    };
+
+    // ==================== FUNÇÕES DE EXCLUSÃO ====================
+    
+    window.validarConfirmacaoExclusao = function(nomeProduto) {
+        const input = document.getElementById('confirmarExclusaoInput');
+        const btn = document.getElementById('btnConfirmarExclusao');
+        if (!input || !btn) return;
+        
+        const digitado = input.value.trim();
+        const nomeCorreto = nomeProduto || '';
+        
+        if (digitado === nomeCorreto) {
+            btn.disabled = false;
+            input.classList.remove('border-danger');
+            input.classList.add('border-success');
+        } else {
+            btn.disabled = true;
+            input.classList.remove('border-success');
+            input.classList.add('border-danger');
+        }
+    };
+
+    window.confirmarExclusao = function(id) {
+        const btn = document.getElementById('btnConfirmarExclusao');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Excluindo...';
+        }
+        
+        fetch(`/produtos/${id}/excluir`, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const linha = document.getElementById(`produto-${id}`);
+                if (linha) linha.remove();
+                
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalExcluir'));
+                if (modal) modal.hide();
+                
+                window.location.reload();
+            } else {
+                throw new Error(data.message || 'Erro ao excluir produto');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao excluir:', error);
+            const body = document.getElementById('modalExcluirBody');
+            if (body) {
+                body.innerHTML = `
+                    <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        Erro ao excluir produto: ${error.message}
+                    </div>
+                    <div class="text-center mt-3">
+                        <button class="btn btn-secondary" onclick="window.fecharModalExcluir()">
+                            <i class="bi bi-arrow-repeat me-1"></i> Tentar novamente
+                        </button>
+                    </div>
+                `;
+            }
+        });
+    };
+
+    window.fecharModalExcluir = function() {
+        const modalElement = document.getElementById('modalExcluir');
+        if (modalElement) {
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) modal.hide();
+        }
+        window.location.reload();
+    };
+
+    // ==================== ENVIO DO FORMULÁRIO ====================
+    
+    window.enviarFormulario = function(url) {
+        const form = document.getElementById('formProduto');
+        if (!form) {
+            console.error('Formulário não encontrado');
+            return;
+        }
+        
+        const formData = new FormData(form);
+        const body = document.getElementById('modalFormBody');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Salvando...';
+        }
+        
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                body.innerHTML = `
+                    <div class="alert alert-success bg-success bg-opacity-10 border border-success">
+                        <i class="bi bi-check-circle-fill me-2"></i> 
+                        ${data.message || 'Operação realizada com sucesso!'}
+                    </div>
+                `;
+                
+                if (data.produto) {
+                    window.atualizarTabela(data.produto);
+                }
+                
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalForm'));
+                    if (modal) modal.hide();
+                    window.location.reload();
+                }, 1500);
+            } else {
+                const errorMsg = data.message || 'Erro ao salvar. Verifique os dados e tente novamente.';
+                body.innerHTML = `
+                    <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        ${errorMsg}
+                    </div>
+                    <div class="text-center mt-3">
+                        <button class="btn btn-secondary" onclick="window.fecharAlertaForm()">
+                            <i class="bi bi-arrow-repeat me-1"></i> Tentar novamente
+                        </button>
+                    </div>
+                `;
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Salvar';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao enviar formulário:', error);
+            body.innerHTML = `
+                <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                    Erro ao enviar formulário: ${error.message || 'Erro desconhecido'}
+                </div>
+                <div class="text-center mt-3">
+                    <button class="btn btn-secondary" onclick="window.fecharAlertaForm()">
+                        <i class="bi bi-arrow-repeat me-1"></i> Tentar novamente
+                    </button>
+                </div>
+            `;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Salvar';
+            }
+        });
+    };
+
+    window.fecharAlertaForm = function() {
+        const form = document.getElementById('formProduto');
+        if (form) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Salvar';
+            }
+        }
+        
+        const title = document.getElementById('modalFormTitle');
+        if (title) {
+            if (title.textContent.includes('Novo Produto')) {
+                window.abrirModalNovo();
+            } else {
+                const form = document.getElementById('formProduto');
+                if (form) {
+                    const action = form.getAttribute('onsubmit');
+                    if (action) {
+                        const match = action.match(/window\.enviarFormulario\('([^']+)'\)/);
+                        if (match && match[1]) {
+                            const urlParts = match[1].split('/');
+                            const id = urlParts[urlParts.length - 1];
+                            if (id && !isNaN(parseInt(id))) {
+                                window.abrirModalEditar(parseInt(id));
+                                return;
+                            }
+                        }
+                    }
+                }
+                window.location.reload();
+            }
+        }
+    };
+
+    // ==================== ATUALIZAÇÃO DA TABELA ====================
+    
+    window.atualizarTabela = function(produto) {
+        if (!produto || !produto.id) return;
+        
+        const tbody = document.getElementById('corpoTabela');
+        if (!tbody) return;
+        
+        const nenhumProduto = document.getElementById('nenhum-produto');
+        if (nenhumProduto) nenhumProduto.remove();
+        
+        const linhaExistente = document.getElementById(`produto-${produto.id}`);
+        if (produto.tipo !== window.tipoProdutoAtivo) {
+            if (linhaExistente) linhaExistente.remove();
+            return;
+        }
+        
+        const tipoNome = {
+            'MP': 'Matéria-prima',
+            'SA': 'Semiacabado',
+            'PA': 'Acabado'
+        }[produto.tipo] || produto.tipo || '-';
+        
+        const statusClass = produto.status === 'Ativo' ? 'bg-success' : 'bg-secondary';
+        const estoqueClass = produto.estoque_atual < produto.estoque_minimo ? 'text-danger' : 'text-success';
+        
+        const temEstrutura = produto.tipo === 'PA' || produto.tipo === 'SA';
+        
+        const novaLinha = `
+            <tr id="produto-${produto.id}" style="cursor:pointer" onclick="window.abrirModalDetalhe(${produto.id})">
+                <td><strong>${produto.codigo || '-'}</strong></td>
+                <td>${produto.descricao || '-'}</td>
+                <td>${produto.unidade || '-'}</td>
+                <td class="${estoqueClass}">${window.formatarQuantidade(produto.estoque_atual, produto.unidade)}</td>
+                <td>${window.formatarQuantidade(produto.estoque_minimo, produto.unidade)}</td>
+                <td><span class="badge ${statusClass}">${produto.status || 'Inativo'}</span></td>
+                <td onclick="event.stopPropagation()">
+                    <button class="btn btn-sm btn-info" onclick="window.abrirModalDetalhe(${produto.id})">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="window.abrirModalEditar(${produto.id})">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    ${temEstrutura ? `
+                        <button class="btn btn-sm btn-primary" onclick="window.abrirModalEstrutura(${produto.id})">
+                            <i class="bi bi-diagram-3"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-danger" onclick="window.abrirModalExcluir(${produto.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        
+        if (linhaExistente) {
+            linhaExistente.outerHTML = novaLinha;
+        } else {
+            tbody.insertAdjacentHTML('beforeend', novaLinha);
+        }
+    };
+
+    // ==================== INICIALIZAÇÃO ====================
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Página de produtos inicializada');
+        console.log('window.maquinas:', window.maquinas);
+
+        if (new URLSearchParams(window.location.search).get('novo') === '1') {
+            window.abrirModalNovo();
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
+        // Carrega componentes disponíveis quando abrir modal de estrutura
+        document.getElementById('modalEstrutura').addEventListener('show.bs.modal', function() {
+            setTimeout(() => {
+                window.carregarComponentesDisponiveis();
+            }, 500);
+        });
+        
+        // Fecha modais ao clicar no overlay
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('hidden.bs.modal', function() {
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+                document.body.classList.remove('modal-open');
+            });
+        });
+        
+        // Permite confirmar exclusão com Enter
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const input = document.getElementById('confirmarExclusaoInput');
+                const btn = document.getElementById('btnConfirmarExclusao');
+                if (input && document.activeElement === input && btn && !btn.disabled) {
+                    btn.click();
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

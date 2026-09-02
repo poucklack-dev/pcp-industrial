@@ -1,0 +1,1007 @@
+<!-- templates/ordens/ordens.html -->
+{% extends "base.html" %}
+
+{% block title %}
+    {% if op and op.numero %}
+        OP {{ op.numero }}
+    {% elif produtos %}
+        Nova OP
+    {% else %}
+        Ordens de producao
+    {% endif %}
+{% endblock %}
+
+{% block page_title %}
+    {% if op and op.numero %}
+        OP {{ op.numero }}
+    {% elif produtos %}
+        Nova Ordem de Producao
+    {% else %}
+        Ordens de producao
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+    .card-ordens {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+
+    .card-ordens:hover {
+        border-color: #484f58;
+    }
+
+    .card-header-ordens {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .card-header-ordens h5 {
+        color: #e6edf3;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin: 0;
+    }
+
+    .badge-count {
+        background: #21262d;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        color: #8b949e;
+        font-weight: 500;
+    }
+
+    .table-ordens {
+        color: #e6edf3;
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.85rem;
+    }
+
+    .table-ordens thead th {
+        color: #8b949e;
+        font-weight: 600;
+        padding: 10px 10px;
+        border-bottom: 1px solid #30363d;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        letter-spacing: 0.3px;
+    }
+
+    .table-ordens tbody td {
+        color: #e6edf3;
+        padding: 10px 10px;
+        border-bottom: 1px solid #21262d;
+        vertical-align: middle;
+    }
+
+    .table-ordens tbody tr:hover {
+        background: rgba(255,255,255,0.02);
+    }
+
+    .table-ordens tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .table-ordens .op-cell {
+        font-weight: 600;
+        color: #e6edf3;
+        font-size: 0.85rem;
+    }
+
+    .status-ordens {
+        display: inline-block;
+        padding: 3px 12px;
+        border-radius: 4px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .status-ordens.planejada { background: #6c757d; color: #ffffff; }
+    .status-ordens.liberada { background: #0d6efd; color: #ffffff; }
+    .status-ordens.em-producao { background: #ffc107; color: #000000; }
+    .status-ordens.pausada { background: #fd7e14; color: #ffffff; }
+    .status-ordens.concluida { background: #198754; color: #ffffff; }
+    .status-ordens.cancelada { background: #dc3545; color: #ffffff; }
+    .status-ordens.aguardando { background: #6c757d; color: #ffffff; }
+
+    .kpi-ordens {
+        font-size: 24px;
+        font-weight: 700;
+        color: #e6edf3;
+    }
+
+    .progress-ordens {
+        background: #21262d;
+        height: 4px;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 10px;
+    }
+
+    .progress-bar-ordens {
+        background: #58a6ff;
+        height: 100%;
+        transition: width 0.3s ease;
+        border-radius: 2px;
+    }
+
+    .form-ordens .form-label {
+        font-weight: 500;
+        color: #8b949e;
+        font-size: 0.75rem;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .form-ordens .form-control,
+    .form-ordens .form-select {
+        background: #0d1117;
+        border: 1px solid #30363d;
+        color: #e6edf3;
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        transition: border-color 0.2s;
+    }
+
+    .form-ordens .form-control:focus,
+    .form-ordens .form-select:focus {
+        background: #0d1117;
+        color: #e6edf3;
+        border-color: #58a6ff;
+        box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        outline: none;
+    }
+
+    .form-ordens .form-control::placeholder {
+        color: #484f58;
+        opacity: 1;
+    }
+
+    .form-ordens .form-select option {
+        background: #161b22;
+        color: #e6edf3;
+        padding: 6px;
+    }
+
+    .btn-outline-light {
+        color: #e6edf3;
+        border: 1px solid #30363d;
+        padding: 6px 16px;
+        font-weight: 500;
+        font-size: 0.85rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+        background: transparent;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-outline-light:hover {
+        background: #21262d;
+        color: #e6edf3;
+        border-color: #484f58;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: #238636;
+        border: 1px solid #238636;
+        color: #ffffff;
+        font-weight: 500;
+        padding: 6px 16px;
+        border-radius: 6px;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-primary:hover {
+        background: #2ea043;
+        border-color: #2ea043;
+        color: #ffffff;
+        text-decoration: none;
+    }
+
+    .btn-success {
+        background: #1f6feb;
+        border: 1px solid #1f6feb;
+        color: #ffffff;
+        font-weight: 500;
+        padding: 6px 16px;
+        border-radius: 6px;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-success:hover {
+        background: #388bfd;
+        border-color: #388bfd;
+        color: #ffffff;
+        text-decoration: none;
+    }
+
+    .btn-danger {
+        background: #da3633;
+        border: 1px solid #da3633;
+        color: #ffffff;
+        font-weight: 500;
+        padding: 6px 16px;
+        border-radius: 6px;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-danger:hover {
+        background: #f85149;
+        border-color: #f85149;
+        color: #ffffff;
+        text-decoration: none;
+    }
+
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 0.75rem;
+    }
+
+    .btn-status {
+        width: 100%;
+        margin-bottom: 6px;
+    }
+
+    .btn-status:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .historico-item {
+        padding: 8px 0;
+        border-bottom: 1px solid #21262d;
+        color: #e6edf3;
+    }
+
+    .historico-item:last-child {
+        border-bottom: none;
+    }
+
+    .historico-data {
+        color: #8b949e;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .historico-descricao {
+        margin-top: 2px;
+        font-size: 0.85rem;
+    }
+
+    .alert {
+        color: #e6edf3;
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-bottom: 14px;
+        border: none;
+    }
+
+    .alert-success {
+        background: #0d2b1e;
+        border: 1px solid #238636;
+    }
+
+    .alert-danger {
+        background: #2d1b1e;
+        border: 1px solid #da3633;
+    }
+
+    .alert-warning {
+        background: #2d2a1b;
+        border: 1px solid #d29922;
+    }
+
+    .alert-secondary {
+        background: #21262d;
+        border: 1px solid #30363d;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 30px 16px;
+    }
+
+    .empty-state .empty-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+        opacity: 0.3;
+        color: #e6edf3;
+    }
+
+    .empty-state .empty-title {
+        color: #8b949e;
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+
+    .empty-state .empty-subtitle {
+        color: #484f58;
+        font-size: 0.8rem;
+    }
+
+    .filter-ordens {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .filter-ordens .form-select {
+        min-width: 160px;
+    }
+
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-3 { margin-top: 1rem; }
+    .mt-4 { margin-top: 1.5rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-3 { margin-bottom: 1rem; }
+    .mb-4 { margin-bottom: 1.5rem; }
+    .d-flex { display: flex; }
+    .justify-content-between { justify-content: space-between; }
+    .align-items-center { align-items: center; }
+    .w-100 { width: 100%; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-3 { gap: 1rem; }
+    .text-center { text-align: center; }
+    .text-muted { color: #8b949e; }
+    .flex-wrap { flex-wrap: wrap; }
+    .no-print { }
+    
+    @media (max-width: 768px) {
+        .card-ordens {
+            padding: 14px;
+        }
+        
+        .table-ordens thead th,
+        .table-ordens tbody td {
+            padding: 6px 6px;
+            font-size: 0.75rem;
+        }
+        
+        .kpi-ordens {
+            font-size: 18px;
+        }
+
+        .filter-ordens .form-select {
+            min-width: 100px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .filter-ordens {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filter-ordens .form-select {
+            min-width: 100%;
+        }
+    }
+
+    .table-responsive {
+        border-radius: 6px;
+        overflow-x: auto;
+        margin: -4px;
+    }
+
+    .table-responsive::-webkit-scrollbar {
+        height: 6px;
+        width: 6px;
+    }
+
+    .table-responsive::-webkit-scrollbar-track {
+        background: #0d1117;
+        border-radius: 3px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #21262d;
+        border-radius: 3px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #30363d;
+    }
+
+    /* Paleta do sistema: azul profundo e texto branco, com contraste alto. */
+    .card-ordens { background: #111c2d; border-color: #29415f; color: #ffffff; }
+    .card-header-ordens { border-color: #29415f; }
+    .card-header-ordens h5, .kpi-ordens, .historico-item, .table-ordens,
+    .table-ordens tbody td, .table-ordens .op-cell { color: #ffffff; }
+    .table-ordens thead th, .form-ordens .form-label, .historico-data,
+    .text-muted, .empty-state .empty-title { color: #cbd5e1 !important; }
+    .table-ordens tbody td, .historico-item { border-color: #29415f; }
+    .table-ordens tbody tr:hover { background: #1b2a41; }
+    .badge-count { background: #263c59; color: #ffffff; }
+    .form-ordens .form-control, .form-ordens .form-select,
+    .form-ordens .form-control:focus, .form-ordens .form-select:focus {
+        background: #0b1524; color: #ffffff; border-color: #496887;
+    }
+    .form-ordens .form-select option { background: #0b1524; color: #ffffff; }
+    .form-ordens .form-control::placeholder, .empty-state .empty-subtitle { color: #b6c4d6; }
+    .btn-outline-light { color: #ffffff; border-color: #496887; background: #172a42; }
+    .btn-outline-light:hover { color: #ffffff; background: #294866; border-color: #7aa7d1; }
+    .status-ordens.planejada, .status-ordens.aguardando { background: #2563eb; color: #ffffff; }
+    .progress-ordens { background: #263c59; }
+    
+    @media print {
+        .no-print { display: none; }
+        .card-ordens {
+            border: 1px solid #ddd;
+            background: white;
+            color: #000;
+        }
+        .card-ordens * {
+            color: #000 !important;
+        }
+        .status-ordens {
+            border: 1px solid #000;
+        }
+        .table-ordens {
+            color: #000;
+        }
+        .table-ordens thead th {
+            color: #000 !important;
+        }
+        .table-ordens tbody td {
+            color: #000 !important;
+        }
+    }
+</style>
+
+<!-- ============================================ -->
+<!-- INDEX - Lista de OP's -->
+<!-- ============================================ -->
+{% if not op and not produtos %}
+
+<div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
+    <form class="row g-2 filter-ordens flex-grow-1" method="get" action="{{ url_for('ordens.index') }}">
+        <div class="col-md-3"><input class="form-control" name="busca" value="{{ busca }}" placeholder="OP, código ou produto"></div>
+        <div class="col-md-2"><select class="form-select" name="status">
+            <option value="">Todos os status</option>
+            {% for s in ['Planejada','Liberada','Em produção','Pausada','Concluída','Cancelada'] %}
+            <option value="{{ s }}" {% if status==s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select></div>
+        <div class="col-md-2"><select class="form-select" name="prioridade"><option value="">Prioridade</option>{% for item in ['Normal','Alta','Urgente'] %}<option value="{{ item }}" {% if prioridade == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><select class="form-select" name="produto_id"><option value="">Produto</option>{% for produto in produtos_filtro %}<option value="{{ produto.id }}" {% if produto_id == produto.id %}selected{% endif %}>{{ produto.codigo }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><input class="form-control" type="date" name="data_inicio" value="{{ data_inicio }}"></div>
+        <div class="col-md-1 d-flex gap-1"><button class="btn btn-outline-light w-100" type="submit" title="Filtrar"><i class="bi bi-funnel"></i></button><a class="btn btn-outline-light" href="{{ url_for('ordens.index') }}" title="Limpar filtros"><i class="bi bi-x-lg"></i></a></div>
+    </form>
+    {% if current_user.tem_permissao('criar_op') %}
+    <a class="btn btn-primary" href="{{ url_for('ordens.nova') }}">Nova OP</a>
+    {% endif %}
+</div>
+
+<div class="card-ordens">
+    <div class="card-header-ordens">
+        <h5>Ordens de Produção</h5>
+        <span class="badge-count">{{ ordens|length }} registros</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-ordens">
+            <thead>
+                <tr>
+                    <th>OP</th>
+                    <th>Produto</th>
+                    <th>Prioridade</th>
+                    <th>Data</th>
+                    <th>Planejado</th>
+                    <th>Progresso</th>
+                    <th>Material</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for op_item in ordens %}
+                <tr>
+                    <td><span class="op-cell">{{ op_item.numero }}</span></td>
+                    <td>{{ op_item.produto.codigo }} - {{ op_item.produto.descricao }}</td>
+                    <td><span class="badge badge-soft {% if op_item.prioridade == 'Urgente' %}text-danger{% elif op_item.prioridade == 'Alta' %}text-warning{% endif %}">{{ op_item.prioridade }}</span></td>
+                    <td>{{ op_item.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ op_item.quantidade_planejada|round(2) }}</td>
+                    {% set progresso = (op_item.quantidade_produzida / op_item.quantidade_planejada * 100) if op_item.quantidade_planejada else 0 %}
+                    <td style="min-width:120px"><div class="d-flex justify-content-between small"><span>{{ op_item.quantidade_produzida|round(2) }}</span><span>{{ progresso|round(0)|int }}%</span></div><div class="progress"><div class="progress-bar" style="width:{{ [progresso,100]|min }}%"></div></div></td>
+                    <td><span class="badge badge-soft {% if situacao_material[op_item.id] == 'Material crítico' %}text-danger{% elif situacao_material[op_item.id] == 'Sem estrutura' %}text-warning{% else %}text-success{% endif %}">{{ situacao_material[op_item.id] }}</span></td>
+                    <td><span class="status-ordens {{ op_item.status|lower|replace(' ', '-')|replace('ç', 'c')|replace('ã', 'a')|replace('á', 'a')|replace('í', 'i') }}">{{ op_item.status }}</span></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-light" onclick="abrirDetalheOP('{{ url_for('ordens.detalhe', id=op_item.id) }}')">Abrir</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10">
+                        <div class="empty-state">
+                            <div class="empty-icon">-</div>
+                            <div class="empty-title">Nenhuma OP encontrada</div>
+                            <div class="empty-subtitle">Clique em "Nova OP" para criar uma ordem de producao</div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- FORM - Nova OP -->
+<!-- ============================================ -->
+{% if produtos %}
+<div class="card-ordens">
+    <div class="card-header-ordens">
+        <h5>Nova Ordem de Producao</h5>
+    </div>
+    <form method="post" class="form-ordens" action="{{ url_for('ordens.nova') }}">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Numero da OP</label>
+                <input class="form-control" name="numero" placeholder="OP-000001" required>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Produto</label>
+                <select class="form-select" name="produto_id" required>
+                    <option value="">Selecione um produto...</option>
+                    {% for p in produtos %}
+                    <option value="{{ p.id }}">{{ p.codigo }} - {{ p.descricao }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Quantidade planejada</label>
+                <input class="form-control" type="number" step="0.0001" name="quantidade_planejada" placeholder="Quantidade" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data</label>
+                <input class="form-control" type="date" name="data" value="{{ now.strftime('%Y-%m-%d') }}" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Prioridade</label>
+                <select class="form-select" name="prioridade">
+                    <option>Normal</option>
+                    <option>Alta</option>
+                    <option>Urgente</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Observacao</label>
+                <textarea class="form-control" name="observacao" rows="2" placeholder="Observacoes da OP..."></textarea>
+            </div>
+        </div>
+        <div class="alert alert-secondary mt-3">
+            A OP define o que sera produzido.
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Criar OP</button>
+            <a class="btn btn-outline-light" href="{{ url_for('ordens.index') }}">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% elif not op and produtos is defined %}
+<div class="card-ordens">
+    <div class="card-header-ordens">
+        <h5>Nova Ordem de Producao</h5>
+    </div>
+    <div class="empty-state">
+        <div class="empty-icon">-</div>
+        <div class="empty-title">Nenhum produto cadastrado</div>
+        <div class="empty-subtitle">Cadastre produtos do tipo SA ou PA para criar uma OP</div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- APONTAR - Formulario de apontamento -->
+<!-- ============================================ -->
+{% if op and apontar %}
+<div class="card-ordens">
+    <div class="card-header-ordens">
+        <h5>Registrar Apontamento - {{ op.numero }}</h5>
+    </div>
+    <form method="post" action="{{ url_for('apontamentos.novo') }}" class="form-ordens">
+        <input type="hidden" name="op_id" value="{{ op.id }}">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Quantidade Produzida</label>
+                <input class="form-control" type="number" step="0.0001" name="quantidade_produzida" placeholder="Quantidade" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Quantidade Boa</label>
+                <input class="form-control" type="number" step="0.0001" name="quantidade_boa" placeholder="Quantidade boa" value="0">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Quantidade Refugada</label>
+                <input class="form-control" type="number" step="0.0001" name="quantidade_refugada" placeholder="Quantidade refugada" value="0">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Operador</label>
+                <select class="form-select" name="operador_id">
+                    <option value="">Selecione...</option>
+                    {% for u in operadores %}
+                    <option value="{{ u.id }}">{{ u.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Observacao</label>
+                <input class="form-control" name="observacao" placeholder="Observacoes do apontamento">
+            </div>
+            <div class="col-12">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success">Registrar Apontamento</button>
+                    <a class="btn btn-outline-light" href="{{ url_for('ordens.detalhe', id=op.id) }}">Cancelar</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- DETALHE - Detalhes da OP -->
+<!-- ============================================ -->
+{% if op and op.id and not imprimir and not apontar %}
+
+<div class="d-flex gap-2 mb-3 flex-wrap no-print">
+    {% if pode_apontar %}
+    <a class="btn btn-success" href="{{ url_for('ordens.apontar', id=op.id) }}">Apontar producao</a>
+    {% endif %}
+    <button type="button" class="btn btn-outline-light" onclick="window.print()">Imprimir OP</button>
+    {% if pode_editar and op.status == 'Planejada' %}
+    <form method="post" action="{{ url_for('ordens.delete', id=op.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir esta OP?');">
+        <button type="submit" class="btn btn-danger">Excluir OP</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="row g-3">
+    <!-- COLUNA PRINCIPAL -->
+    <div class="col-lg-8">
+        <!-- Informacoes da OP -->
+        <div class="card-ordens">
+            <div class="row">
+                <div class="col-md-6">
+                    <span class="text-muted">Produto</span>
+                    <h5>{{ op.produto.codigo }} - {{ op.produto.descricao }}</h5>
+                    <span class="text-muted">Tipo: {{ op.produto.tipo }}</span>
+                    <br>
+                    <span class="text-muted">Prioridade: <strong>{{ op.prioridade }}</strong></span>
+                    <br>
+                    <span class="text-muted">Data: {{ op.data.strftime('%d/%m/%Y') }}</span>
+                </div>
+                <div class="col-md-2">
+                    <span class="text-muted">Planejado</span>
+                    <div class="kpi-ordens">{{ op.quantidade_planejada|round(2) }}</div>
+                </div>
+                <div class="col-md-2">
+                    <span class="text-muted">Produzido</span>
+                    <div class="kpi-ordens">{{ op.quantidade_produzida|round(2) }}</div>
+                </div>
+                <div class="col-md-2">
+                    <span class="text-muted">Saldo</span>
+                    <div class="kpi-ordens">{{ (op.quantidade_planejada - op.quantidade_produzida)|round(2) }}</div>
+                </div>
+            </div>
+            
+            {% set percentual = (op.quantidade_produzida / op.quantidade_planejada * 100) if op.quantidade_planejada > 0 else 0 %}
+            <div class="progress-ordens">
+                <div class="progress-bar-ordens" style="width:{% if percentual > 100 %}100{% else %}{{ percentual }}{% endif %}%"></div>
+            </div>
+            <div class="mt-2 text-muted">
+                Progresso: {{ percentual|round(1) }}%
+            </div>
+            {% if op.observacao %}
+            <div class="mt-3">
+                <span class="text-muted">Observacao:</span>
+                <p class="mb-0">{{ op.observacao }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Estrutura / Componentes -->
+        <div class="card-ordens mt-3">
+            <div class="card-header-ordens">
+                <h5>Componentes diretos</h5>
+                <span class="badge-count">{{ estrutura|length }} itens</span>
+            </div>
+            {% if estrutura %}
+            <div class="table-responsive">
+                <table class="table table-ordens">
+                    <thead>
+                        <tr>
+                            <th>Componente</th>
+                            <th>Necessario</th>
+                            <th>Consumido</th>
+                            <th>Saldo</th>
+                            <th>Unidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in estrutura %}
+                        {% set necessario = e.quantidade * op.quantidade_planejada %}
+                        {% set consumido = e.quantidade * op.quantidade_produzida %}
+                        <tr>
+                            <td>{{ e.componente.codigo }} - {{ e.componente.descricao }}</td>
+                            <td>{{ necessario|round(2) }}</td>
+                            <td>{{ consumido|round(2) }}</td>
+                            <td>{{ (necessario - consumido)|round(2) }}</td>
+                            <td>{{ e.componente.unidade }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">-</div>
+                <div class="empty-title">Nenhum componente cadastrado</div>
+                <div class="empty-subtitle">Adicione componentes a estrutura do produto</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Apontamentos -->
+        <div class="card-ordens mt-3">
+            <div class="card-header-ordens">
+                <h5>Apontamentos</h5>
+                <span class="badge-count">{{ op.apontamentos|length }} registros</span>
+            </div>
+            {% if op.apontamentos %}
+            <div class="table-responsive">
+                <table class="table table-ordens">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Operador</th>
+                            <th>Qtd.</th>
+                            <th>Boa</th>
+                            <th>Refugo</th>
+                            <th>Obs.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in op.apontamentos|sort(attribute='data_hora', reverse=true) %}
+                        <tr>
+                            <td>{{ a.data_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ a.operador.nome if a.operador else '-' }}</td>
+                            <td>{{ a.quantidade_produzida|round(2) }}</td>
+                            <td>{{ a.quantidade_boa|round(2) }}</td>
+                            <td>{{ a.quantidade_refugada|round(2) }}</td>
+                            <td>{{ a.observacao or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">-</div>
+                <div class="empty-title">Nenhum apontamento registrado</div>
+                <div class="empty-subtitle">Clique em "Apontar producao" para registrar</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- COLUNA LATERAL -->
+    <div class="col-lg-4">
+        <!-- Status da OP -->
+        <div class="card-ordens">
+            <div class="card-header-ordens">
+                <h5>Status</h5>
+            </div>
+            <div class="mb-3">
+                <span class="status-ordens {{ op.status|lower|replace(' ', '-')|replace('ç', 'c')|replace('ã', 'a')|replace('á', 'a')|replace('í', 'i') }}">{{ op.status }}</span>
+            </div>
+            
+            {% if pode_editar and op.status not in ['Cancelada', 'Concluida'] %}
+            <div class="mt-2">
+                <form method="post" action="{{ url_for('ordens.status', id=op.id, novo='Liberada') }}">
+                    <button class="btn btn-sm btn-outline-light btn-status" {% if op.status == 'Liberada' %}disabled{% endif %}>Liberada</button>
+                </form>
+                <form method="post" action="{{ url_for('ordens.status', id=op.id, novo='Em producao') }}">
+                    <button class="btn btn-sm btn-outline-light btn-status" {% if op.status == 'Em producao' %}disabled{% endif %}>Em producao</button>
+                </form>
+                <form method="post" action="{{ url_for('ordens.status', id=op.id, novo='Pausada') }}">
+                    <button class="btn btn-sm btn-outline-light btn-status" {% if op.status == 'Pausada' %}disabled{% endif %}>Pausada</button>
+                </form>
+                <form method="post" action="{{ url_for('ordens.status', id=op.id, novo='Concluida') }}">
+                    <button class="btn btn-sm btn-outline-light btn-status" {% if op.status == 'Concluida' %}disabled{% endif %}>Concluida</button>
+                </form>
+                <form method="post" action="{{ url_for('ordens.status', id=op.id, novo='Cancelada') }}">
+                    <button class="btn btn-sm btn-outline-light btn-status" {% if op.status == 'Cancelada' %}disabled{% endif %}>Cancelada</button>
+                </form>
+            </div>
+            {% elif op.status == 'Cancelada' %}
+            <div class="alert alert-danger">
+                <strong>OP Cancelada</strong><br>
+                Esta ordem de producao foi cancelada.
+                {% if pode_editar %}
+                <form method="post" action="{{ url_for('ordens.reabrir', id=op.id) }}" class="mt-2">
+                    <button class="btn btn-sm btn-outline-light" type="submit"><i class="bi bi-arrow-counterclockwise"></i> Reabrir OP</button>
+                </form>
+                {% endif %}
+            </div>
+            {% elif op.status == 'Concluida' %}
+            <div class="alert alert-success">
+                <strong>OP Concluida</strong><br>
+                Esta ordem de producao foi finalizada com sucesso.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Historico -->
+        <div class="card-ordens mt-3">
+            <div class="card-header-ordens">
+                <h5>Historico</h5>
+                <span class="badge-count">{{ historico|length }} eventos</span>
+            </div>
+            {% if historico %}
+            <div style="max-height: 350px; overflow-y: auto;">
+                {% for h in historico %}
+                <div class="historico-item">
+                    <div class="historico-data">{{ h.data_hora.strftime('%d/%m/%Y %H:%M') }}</div>
+                    <div class="historico-descricao">{{ h.descricao }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">-</div>
+                <div class="empty-title">Sem historico</div>
+                <div class="empty-subtitle">Nenhuma acao registrada ainda</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- IMPRIMIR - Versao para impressao -->
+<!-- ============================================ -->
+{% if op and imprimir %}
+<div class="no-print mb-3">
+    <button class="btn btn-primary" onclick="window.print()">Imprimir</button>
+    <a class="btn btn-outline-light" href="{{ url_for('ordens.detalhe', id=op.id) }}">Voltar</a>
+</div>
+
+<div style="max-width: 900px; margin: 0 auto;">
+    <h1 class="h3">ORDEM DE PRODUCAO - {{ op.numero }}</h1>
+
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0;">
+        <div class="card-ordens" style="padding: 15px;">
+            <b>Produto</b><br>
+            {{ op.produto.codigo }} - {{ op.produto.descricao }}
+        </div>
+        <div class="card-ordens" style="padding: 15px;">
+            <b>Tipo</b><br>
+            {{ op.produto.tipo }}
+        </div>
+        <div class="card-ordens" style="padding: 15px;">
+            <b>Quantidade</b><br>
+            {{ op.quantidade_planejada|round(2) }}
+        </div>
+        <div class="card-ordens" style="padding: 15px;">
+            <b>Status</b><br>
+            {{ op.status }}
+        </div>
+    </div>
+
+    <h4>Estrutura</h4>
+    <div class="card-ordens">
+        <div class="table-responsive">
+            <table class="table table-ordens">
+                <thead>
+                    <tr>
+                        <th>Componente</th>
+                        <th>Qtd. por unidade</th>
+                        <th>Qtd. planejada</th>
+                        <th>Unidade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in estrutura %}
+                    <tr>
+                        <td>{{ e.componente.codigo }} - {{ e.componente.descricao }}</td>
+                        <td>{{ e.quantidade|round(2) }}</td>
+                        <td>{{ (e.quantidade * op.quantidade_planejada)|round(2) }}</td>
+                        <td>{{ e.componente.unidade }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>Apontamentos</h4>
+    <div class="card-ordens">
+        <div class="table-responsive">
+            <table class="table table-ordens">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Operador</th>
+                        <th>Produzida</th>
+                        <th>Boa</th>
+                        <th>Refugo</th>
+                        <th>Observacao</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in op.apontamentos %}
+                    <tr>
+                        <td>{{ a.data_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ a.operador.nome if a.operador else '-' }}</td>
+                        <td>{{ a.quantidade_produzida|round(2) }}</td>
+                        <td>{{ a.quantidade_boa|round(2) }}</td>
+                        <td>{{ a.quantidade_refugada|round(2) }}</td>
+                        <td>{{ a.observacao or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 80px;">
+        <div style="border-top: 1px solid #111; padding-top: 8px; text-align: center;">
+            Operador / Responsavel
+        </div>
+        <div style="border-top: 1px solid #111; padding-top: 8px; text-align: center;">
+            Responsavel PCP
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<div class="modal fade" id="modalDetalheOP" tabindex="-1" aria-labelledby="modalDetalheOPTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="modalDetalheOPTitulo">Detalhes da ordem de produção</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body p-0"><iframe id="detalheOPFrame" title="Detalhes da ordem" class="w-100 border-0" style="min-height:72vh"></iframe></div>
+    </div>
+  </div>
+</div>
+<script>
+  window.abrirDetalheOP = function(url) {
+    document.getElementById('detalheOPFrame').src = url;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDetalheOP')).show();
+  };
+  document.getElementById('modalDetalheOP').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('detalheOPFrame').src = 'about:blank';
+  });
+</script>
+{% endblock %}

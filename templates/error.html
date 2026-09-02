@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Erro {{ code }} · PCP Industrial{% endblock %}
+{% block content %}
+<section class="card mx-auto text-center" style="max-width:620px">
+  <div class="display-2 fw-bold">{{ code }}</div>
+  <h1 class="h4 mt-2">Não foi possível concluir a solicitação</h1>
+  <p class="muted">{{ message }}</p>
+  <a class="btn btn-primary" href="{{ url_for('index') }}">Voltar ao início</a>
+</section>
+{% endblock %}
